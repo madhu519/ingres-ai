@@ -1,0 +1,145 @@
+# INGRES Causal Policy Assistant
+
+INGRES Causal Policy Assistant is a full-stack application for exploring groundwater policy scenarios in India. It combines:
+
+- **Google TimesFM 2.5** for baseline groundwater-stage forecasts
+- A **causal intervention model** for policy counterfactuals
+- **Groq** for extracting simulation parameters from natural-language questions
+- **Gemini** for generating policy explanations
+- **FastAPI** and **Next.js** for the backend API and web interface
+
+> This application produces exploratory model projections. Its results are not official CGWB assessments or policy recommendations.
+
+## Quick start
+
+### 1. Configure API keys
+
+Create `.env` in the repository root:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+GROQ_API_KEY=your_groq_api_key
+```
+
+Do not commit this file or expose the keys. `.env` is ignored by Git.
+
+### 2. Install backend dependencies
+
+Requirements: Python 3.11+, Node.js 18+, and a supported PyTorch installation.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r backend\requirements.txt
+```
+
+### 3. Install frontend dependencies
+
+```powershell
+cd frontend
+npm install
+cd ..
+```
+
+### 4. Start the backend
+
+Run from the repository root:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+The backend is available at [http://localhost:8000](http://localhost:8000). API documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+### 5. Start the frontend
+
+In a second terminal:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+The first backend startup downloads the TimesFM model from Hugging Face and may take several minutes.
+
+## What you can simulate
+
+The assistant supports these interventions:
+
+- `crop_diversification_and_micro_irrigation`
+- `artificial_recharge_structures`
+- `power_subsidy_rationalization`
+
+You can ask questions such as:
+
+> In Nakodar, what happens if 35% of paddy shifts to micro-irrigation over three years?
+
+The response includes the baseline forecast, causal projection, projected groundwater category, and year-by-year effects.
+
+## API
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/health` | Reports backend initialization status |
+| `GET` | `/api/hierarchy` | Returns the state, district, and block hierarchy |
+| `POST` | `/api/simulate` | Runs a natural-language policy simulation |
+| `POST` | `/api/simulate-direct` | Runs a simulation with explicit parameters |
+
+### Natural-language simulation
+
+```powershell
+Invoke-RestMethod `
+  -Uri http://localhost:8000/api/simulate `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body '{"query":"In Nakodar, simulate 35% crop diversification over 3 years"}'
+```
+
+### Direct simulation
+
+```powershell
+Invoke-RestMethod `
+  -Uri http://localhost:8000/api/simulate-direct `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body '{"block_name":"Nakodar","intervention":"crop_diversification_and_micro_irrigation","adoption_pct":0.35,"horizon_years":3}'
+```
+
+For direct simulations:
+
+- `adoption_pct` must be between `0.05` and `1.0`.
+- `horizon_years` must be between `1` and `10`.
+- `block_name` may be accompanied by `state` and `district` when needed.
+
+## Project structure
+
+```text
+INGRES-Agent/
+├── backend/
+│   ├── causal_forecaster.py       # TimesFM forecast and causal simulation engine
+│   ├── causal_service.py          # Causal-service helpers
+│   ├── india_groundwater_data.py  # Groundwater profiles and hierarchy
+│   ├── llm_router.py              # Groq extraction and Gemini responses
+│   ├── main.py                    # FastAPI app and API routes
+│   └── requirements.txt
+├── frontend/
+│   ├── app/                       # Next.js App Router application
+│   └── package.json
+├── test_orchestrator.py           # Backend orchestration smoke test
+└── .env                           # Local secrets; do not commit
+```
+
+## Testing
+
+Run the backend smoke test after installing dependencies and configuring API keys:
+
+```powershell
+python test_orchestrator.py
+```
+
+This initializes the forecasting engine and runs a sample policy query. CPU inference can require substantial memory; a CUDA-enabled PyTorch installation may improve performance.
